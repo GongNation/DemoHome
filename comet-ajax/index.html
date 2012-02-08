@@ -1,0 +1,101 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <title>Comet demo</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <script type="text/javascript" src="http://lib.sinaapp.com/js/jquery/1.7/jquery.min.js"></script>
+  </head>
+  <body>
+
+<div id="content">
+</div>
+
+<p>
+  <form action="" method="get">
+    <input type="text" name="word" id="word" value="" />
+    <input type="button" id="send" name="send" value="Send" />
+    <input type="button" id="stop" name="stop" value="stop" />
+  </form>
+</p>
+
+<script type="text/javascript">
+var Comet = function(options){
+	this.init(options);
+};
+Comet.prototype = {
+	constructor: Comet,
+	init:function(options){
+		this.options = {
+			url:"",
+			callback:function(){}
+		}
+		this.options = $.extend(this.options,options||{});
+		this.url = this.options.url;
+		this.callback = this.options.callback;
+		this.timestamp = 0;
+		this.noerror = true;
+		this.lock = true;
+	},
+	connect: function(){
+		this.lock = false;
+		this.ajaxLoop();
+	},
+	  disconnect: function(){
+		this.lock = true;
+	},
+	ajaxLoop: function(msg){
+		if(this.url && !this.lock){
+			var _this = this;
+			$.ajax({
+				url:_this.url,
+				type:'get',
+				data:'timestamp=' + _this.timestamp,
+				dataType:'json',
+				cache:false,
+				success:function(json){
+					if (_this.timestamp != json['timestamp']) {
+						_this.timestamp = json['timestamp'];
+						_this.handleResponse(json);
+						_this.noerror = true;
+					}
+				},
+				complete:function(){
+					if (_this.noerror){
+						_this.ajaxLoop();
+					}else{
+						// if a connection problem occurs, try to reconnect each 5 seconds
+						setTimeout(function(){_this.ajaxLoop()}, 5000); 
+					}
+					_this.noerror = false;
+				}
+			})
+		}
+	},
+	handleResponse: function(response){
+		this.callback(response);
+	},
+
+	doRequest: function(request){
+		if(this.url && !this.lock){
+			$.get(this.url, { 'msg': request } ); 
+		}
+	}
+}
+var comet = new Comet({
+	url:'./backend.php',
+	callback:function(response){
+		$('#content').append('<div>' + response['msg'] + '</div>');
+	}
+});
+comet.connect();
+$("#send").click(function(){
+	comet.doRequest($('#word').val());
+	$('#word').val('');
+})
+$("#stop").click(function(){
+	comet.disconnect();
+})
+</script>
+
+</body>
+</html>
